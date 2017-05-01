@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <script type="text/javascript" src="js/d3.min.js"></script>
+        <script src='https://api.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.js'></script>
+        <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"
+                integrity="sha512-A7vV8IFfih/D732iSSKi20u/ooOfj/AGehOKq0f4vLT1Zr2Y+RX7C+w8A1gaSasGtRUZpF/NZgzSAu4/Gc41Lg=="
+                crossorigin=""></script>
+
+        <link href='https://api.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.css' rel='stylesheet' />  
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css"
+              integrity="sha512-07I2e+7D8p6he1SIM+1twR5TIrhUQn9+I6yjqD53JQjFiMf8EtC93ty0/5vJTZGF8aAocvHYNEDJajGdNx1IsQ=="
+              crossorigin=""/>   
+
+        <script type="text/javascript" src="js/leaflet.markercluster.js"></script>
+
+        <link href="stylesheets/MarkerCluster.Default.css" rel="stylesheet"/>
+        <link href='stylesheets/MarkerCluster.css' rel='stylesheet' />
+
+        <style>
+            #mapid { height: 600px; },
+            .leaflet-div-icon{
+                background: none;
+                border: none;
+            }
+/*
+            .stop-marker{
+                background-clip: padding-box;
+                border-radius: 20px;
+                background-color: rgba(253, 156, 115, 0.6);
+            }
+*/
+
+            .stop-marker div{
+                width: 30px;
+                height: 30px;
+                margin-left: 5px;
+                margin-top: 5px;
+                text-align: center;
+                border-radius: 15px;
+                font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+                background-color: rgba(253, 156, 115, 0.9);
+            }
+            
+            .stop-marker span{
+                line-height: 30px;
+            }
+        </style>
+
+        <title>BLUBERE</title>
+
+    </head>
+    <body>
+        <div id="mapid"></div>
+        <script type="text/javascript">
+
+            // Constants 
+            var MAX_VERSPÄTUNG = 360;
+            var MIN_VERSPÄTUNG = 0;
+            var MAX_COLOR = 120;
+            var RATIO = MAX_VERSPÄTUNG/MAX_COLOR;
+
+            // Global variables
+            var mymap
+            var verspätung = 0;
+            var size = 0.5;
+
+            // Helper function
+            function makeHSL(feature){
+                verspätung = ( verspätung > MAX_VERSPÄTUNG)  ? 
+                    MAX_VERSPÄTUNG : 
+                verspätung;
+
+                verspätung = ( MIN_VERSPÄTUNG > verspätung ) ? 
+                    MIN_VERSPÄTUNG : 
+                verspätung;
+
+                var hue = MAX_COLOR - (verspätung / RATIO);
+
+                return 'hsl('+hue+', 100%, 50%)';
+            }
+
+            // Helper function
+            function makeRadius(feature){
+                var radius = 20 * size;
+                size = Math.random();
+                return radius;
+            }
+
+            // Helper function
+            function makeMarker(feature){
+                var hsl = makeHSL(feature);
+                var radius = makeRadius(feature);
+
+                verspätung = Math.round(Math.random() * 360);
+
+                return '<div><span>'+ verspätung +' </span></div>';
+                return '<svg width="50" height="50"><circle cx="25" cy="25" r="'+radius+'" fill="'+hsl+'" /></svg>';
+            }
+
+            // Old function
+            function drawGrid(stations){
+                d3.selectAll('.grid-marker').remove();
+
+
+                L.geoJSON(stations, {
+                    pointToLayer: function (feature, latlng) {
+                        var markerIcon = L.divIcon({
+                            className: 'marker-cluster grid-marker marker-cluster-large',
+                            html:   makeMarker(feature)
+                        });
+
+                        return L.marker(latlng, {
+                            icon: markerIcon
+                        })
+                    }, 
+                }).addTo(mymap);
+            }
+
+            /*
+            Method that is called when a cluster is created. 
+            */
+            function clusterIconFunction(cluster){
+                var markers = cluster.getAllChildMarkers();
+                var n = markers.length;
+
+                return L.divIcon({
+                    html: '<div><span> '+ markers.length + ' </span></div>',
+                    className: 'marker-cluster grid-marker marker-cluster-large',
+                    iconSize: L.point(40,40)
+                });
+            }
+
+
+            /*     
+            Main rendering method
+                Gets executed as soon as d3 has loaded the stops and 
+                ist-data. If an error occurs during loading, the method
+                returns immediately and prints the corresponding error codes
+                to the console. 
+                 */   
+            function renderMap(error, stations, data){
+                if(error){
+                    console.log(error);     
+                    return 1;
+                } // Error handling 
+
+                var length = stations.features.length;
+
+                /* For development purposes, will be deleted for deply 
+                TODO: Delete */
+                var bern;
+                for(i = 0; i < length; i++){
+                    if(stations.features[i].properties.name === "Bern"){
+                        bern = stations.features[i];
+                        console.log(bern);
+                        break;
+                    }
+                }
+
+                // Initialize the map 
+                mymap = L.map('mapid').setView([47, 8.3], 6);
+
+                // Loads the map from mapbox and ads the layer to the map
+                L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
+                    attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+                    maxZoom: 18,
+                    id: 'mapbox.streets',
+                    accessToken: 'pk.eyJ1IjoiZHJpYmxlbSIsImEiOiJjajFxZWMwNnQwMDl3MndudDRzM2lhcGx0In0.CJhKrb7LQqFY0vX2-GQH5w'
+                }).addTo(mymap);
+
+                // Initialize the cluster 
+                var markers = L.markerClusterGroup({
+                    iconCreateFunction: clusterIconFunction,
+                });
+
+                // Add the markers to the cluster 
+                for(i = 0; i < length; i++){
+                    var feature = stations.features[i];
+                    var title = feature.properties.name;
+
+                    var markerIcon = L.divIcon({
+                        className: '"'+feature.properties.name + '"-stop-marker stop-marker grid-marker',
+                        html:   makeMarker(feature),
+                        iconSize: L.point(40,40)
+                    });
+
+                    var marker = L.marker(new L.LatLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]), {
+                        title: title,
+                        icon: markerIcon
+                    })
+                    markers.addLayer(marker);
+                }
+
+                // Add the cluster to the map 
+                mymap.addLayer(markers);
+            }
+
+            // Fetches data and then calls the renderMap back 
+            d3.queue()
+                .defer(d3.json, 'data/haltestellen.geojson')
+                //.defer(d3.json, 'data/ist-daten-sbb-tag.json')
+                .await(renderMap);
+        </script>
+    </body>
+</html>
