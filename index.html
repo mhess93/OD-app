@@ -1,198 +1,250 @@
-<!doctype html><html lang="en"><head><script type="text/javascript" src="js/d3.min.js"></script><script src='https://api.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.js'></script><script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"
+<!doctype html>
+<html lang="en">
+    <head>
+        <script type="text/javascript" src="js/d3.min.js"></script>
+        <script src='https://api.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.js'></script>
+        <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"
                 integrity="sha512-A7vV8IFfih/D732iSSKi20u/ooOfj/AGehOKq0f4vLT1Zr2Y+RX7C+w8A1gaSasGtRUZpF/NZgzSAu4/Gc41Lg=="
-                crossorigin=""></script><link href='https://api.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.css' rel='stylesheet' /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css"
-                                                                                                                                        integrity="sha512-07I2e+7D8p6he1SIM+1twR5TIrhUQn9+I6yjqD53JQjFiMf8EtC93ty0/5vJTZGF8aAocvHYNEDJajGdNx1IsQ=="
-                                                                                                                                        crossorigin=""/><script type="text/javascript" src="js/leaflet.markercluster.js"></script><link href="stylesheets/MarkerCluster.Default.css" rel="stylesheet"/><link href='stylesheets/MarkerCluster.css' rel='stylesheet' /><style>
-    #mapid { height: 600px; },
-    .leaflet-div-icon{
-        background: none;
-        border: none;
-    }
-    /*
-    .stop-marker{
-    background-clip: padding-box;
-    border-radius: 20px;
-    background-color: rgba(253, 156, 115, 0.6);
-    }
-    */
+                crossorigin=""></script>
+        <link href='https://api.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.css' rel='stylesheet' />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css" 
+              y="sha512-07I2e+7D8p6he1SIM+1twR5TIrhUQn9+I6yjqD53JQjFiMf8EtC93ty0/5vJTZGF8aAocvHYNEDJajGdNx1IsQ==" crossorigin=""/>
+        <!--"sha512-07I2e+7D8p6he1SIM+1twR5TIrhUQn9+I6yjqD53JQjFiMf8EtC93ty0/5vJTZGF8aAocvHYNEDJajGdNx1IsQ=="
+crossorigin=""/> -->
+        <script type="text/javascript" src="js/leaflet.markercluster.js"></script>
+        <link href="stylesheets/MarkerCluster.Default.css" rel="stylesheet"/>
+        <link href='stylesheets/MarkerCluster.css' rel='stylesheet' /><style>
+        #THE-map { height: 600px; },
+        .leaflet-div-icon{
+            background: none;
+            border: none;
+        }
 
-    .stop-marker div{
-        width: 30px;
-        height: 30px;
-        margin-left: 5px;
-        margin-top: 5px;
-        text-align: center;
-        border-radius: 15px;
-        font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
-        background-color: rgba(253, 156, 115, 0.9);
-    }
+        .div-icon-indiv div{
+            height: 100%;
+            width: 100%;
+            border-radius: 50%;
 
-    .stop-marker span{
-        line-height: 30px;
-    }
-    </style><title>BLUBERE</title></head><body><div id="mapid"></div><script type="text/javascript">
+        } 
+        
+        .div-icon-indiv div span{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-50%);
+        }
 
-    // Constants
-    var MAX_VERSPÄTUNG = 360;
-    var MIN_VERSPÄTUNG = 0;
-    var MAX_COLOR = 120;
-    var RATIO = MAX_VERSPÄTUNG/MAX_COLOR;
-    var DATA;
+        .leaflet-popup-content ul{
+            list-style-type: none;
+            padding-left: 0px;
+        }
+        </style>
+        <title>BLUBERE</title>
+    </head>
+    <body>
+        <div id="THE-map"></div>
+        <script type="text/javascript">
+            // Constants
 
-    // Global variables
-    var mymap
-    var verspätung = 0;
-    var size = 0.5;
+            var rLow = 57;
+            var gLow = 190;
+            var bLow = 5;
+            var rHigh = 255;
+            var gHigh = 26;
+            var bHigh = 6;
+            var MAX_VERSPÄTUNG = 30;
+            var MIN_VERSPÄTUNG = 0;
+            var MAX_COLOR = 120;
+            var MAX_ZOOM = 18;
+            var MIN_ZOOM = 0;
+            var MIN_RADIUS = 10;
+            var MAX_RADIUS = 200;
+            
+            var showDelay = true;
 
-    // Helper function
-    function makeHSL(feature){
-        verspätung = ( verspätung > MAX_VERSPÄTUNG)  ?
-            MAX_VERSPÄTUNG :
-        verspätung;
+            // Global variables
+            var mymap
 
-        verspätung = ( MIN_VERSPÄTUNG > verspätung ) ?
-            MIN_VERSPÄTUNG :
-        verspätung;
-
-        var hue = MAX_COLOR - (verspätung / RATIO);
-
-        return 'hsl('+hue+', 100%, 50%)';
-    }
-
-    // Helper function
-    function makeRadius(feature){
-        return DATA[feature.properties.name];
-    }
-
-    // Helper function
-    function makeMarker(feature){
-        verspätung = Math.round(DATA[feature.properties.name]);
-
-        return '<div><span>'+ verspätung +' </span></div>';
-    }
-
-    // Old function
-    function drawGrid(stations){
-        d3.selectAll('.grid-marker').remove();
-
-
-        L.geoJSON(stations, {
-            pointToLayer: function (feature, latlng) {
-                var markerIcon = L.divIcon({
-                    className: 'marker-cluster grid-marker marker-cluster-large',
-                    html:   makeMarker(feature)
-                });
-
-                return L.marker(latlng, {
-                    icon: markerIcon
-                })
-            },
-        }).addTo(mymap);
-    }
-
-    /*
+            /*
             Method that is called when a cluster is created.
             */
-    function clusterIconFunction(cluster){
-        var markers = cluster.getAllChildMarkers();
-        var n = markers.length;
-        console.log(markers);
-        var title; 
-        var time = 0;
-        for(i = 0; i < n; i++){
-            title = title + " " + markers[i].options.title;
-            time = time + DATA[markers[i].options.title];
+            function clusterIconFunction(cluster){
+                var m = cluster;
+                var markers = cluster.getAllChildMarkers();
+                var n = markers.length;
+                var totalDelay = 0;
+                for(i = 0; i < n; i++){
+                    totalDelay = totalDelay + markers[i].options.delay;
+                }
+                var normalizedDelay = normalizeDelay(Math.round(totalDelay / n));
+                var rgb = calculateRGBA(normalizedDelay, 0.6);
+                var size = calculateClusterIconSize(n);
+                var icon = L.divIcon({ 
+                    html: '<div style="background-color:'+rgb+'"></div>',
+                    className: 'marker-cluster grid-marker div-icon-indiv',
+                    iconSize: L.point(size,size)
+                });
 
-        }
-        time = Math.round(time / n);
-        
-        console.log(title);
-        
+                return icon;
+            }
 
+            function calculateClusterIconSize(n){
+                var tempSize = n >=  1 ? n : 0;
+                tempSize = n < 40 ? n : 50;
+                tempSize = (tempSize / 40) * (45 - 25) + 25;
+                return tempSize;
 
-        return L.divIcon({
-            html: '<div><span> '+ time + ' </span></div>',
-            className: 'marker-cluster grid-marker marker-cluster-large',
-            iconSize: L.point(40,40)
-        });
-    }
+            }
 
+            function calculateClusterRadius(mapZoom){
+                var temp = ((mapZoom - MIN_ZOOM) * (MAX_RADIUS - MIN_RADIUS)) / (MAX_ZOOM - MIN_ZOOM) + MIN_RADIUS;
+                return Math.round(temp);
+            }
 
-    /*
+            function normalizeDelay(averageDelay){
+                var tempDelay = averageDelay >= MIN_VERSPÄTUNG ? averageDelay : MIN_VERSPÄTUNG;
+                tempDelay = tempDelay < MAX_VERSPÄTUNG ? tempDelay : MAX_VERSPÄTUNG;
+                tempDelay = (tempDelay - MIN_VERSPÄTUNG)/(MAX_VERSPÄTUNG - MIN_VERSPÄTUNG);
+
+                return tempDelay;
+            }
+
+            function calculateRGBA(normalizedDelay, alpha){
+                var r = Math.round(rLow + normalizedDelay * ( rHigh - rLow ));
+                var g = Math.round(gLow + normalizedDelay * ( gHigh - gLow ));
+                var b = Math.round(bLow + normalizedDelay * ( bHigh - bLow ));
+                return "rgba("+r+","+g+","+b+","+alpha+")";
+            }
+
+            function structureStopData(dataEntry){
+                return "<ul>" 
+                    + "<li>Haltestelle: "+dataEntry['name'] + "</li>"
+                    + "<li>Durchsch. Verspätung: "+Math.round(dataEntry['totalDelay']/dataEntry['delayCounter']) + "</li>"
+                    +"</ul>"; 
+            }
+
+            /*
             Main rendering method
                 Gets executed as soon as d3 has loaded the stops and
                 ist-data. If an error occurs during loading, the method
                 returns immediately and prints the corresponding error codes
                 to the console.
                  */
-    function renderMap(error, stations, data){
-        if(error){
-            console.log(error);
-            return 1;
-        } // Error handling
-        DATA = data[0];
+            function renderMap(error, stations_json, bpuic_data){
+                if(error){
+                    console.log(error);
+                    return 1;
+                } // Error handling
 
-        var length = stations.features.length;
 
-        /* For development purposes, will be deleted for deply
+                /* For development purposes, will be deleted for deply
                 TODO: Delete */
-        var bern;
-        for(i = 0; i < length; i++){
-            if(stations.features[i].properties.name === "Bern"){
-                bern = stations.features[i];
-                // console.log(bern);
-                break;
-            }
-        }
+                var bern, biel;
+                for(i = 0; i < stations_json.length; i++){
+                    if(stations_json[i].fields.name === "Bern"){
+                        bern = stations_json[i]
+                        //console.log(bern);
 
-        // Initialize the map
-        mymap = L.map('mapid').setView([47, 8.3], 6);
+                    }
+                    if(stations_json[i].fields.name === "Biel/Bienne"){
+                        biel = stations_json[i];
+                        //console.log(biel);
+                    }
+                }
 
-        // Loads the map from mapbox and ads the layer to the map
-        L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
-            attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
-            maxZoom: 18,
-            id: 'mapbox.streets',
-            accessToken: 'pk.eyJ1IjoiZHJpYmxlbSIsImEiOiJjajFxZWMwNnQwMDl3MndudDRzM2lhcGx0In0.CJhKrb7LQqFY0vX2-GQH5w'
-        }).addTo(mymap);
+                // Initialize the map
+                mymap = L.map('THE-map').setView([47, 8.3], 8);
 
-        // Initialize the cluster
-        var markers = L.markerClusterGroup({
-            iconCreateFunction: clusterIconFunction,
-        });
+                // Loads the map from mapbox and ads the layer to the map
+                L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
+                    attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+                    maxZoom: 18,
+                    id: 'mapbox.streets',
+                    accessToken: 'pk.eyJ1IjoiZHJpYmxlbSIsImEiOiJjajFxZWMwNnQwMDl3MndudDRzM2lhcGx0In0.CJhKrb7LQqFY0vX2-GQH5w'
+                }).addTo(mymap);
 
-        // Add the markers to the cluster
-        for(i = 0; i < length; i++){
-            var feature = stations.features[i];
-            var title = feature.properties.name;
-            var verspätung = Math.round(DATA[feature.properties.name]);
-            if(!isNaN(verspätung)){
-                var markerIcon = L.divIcon({
-                    className: '"'+feature.properties.name + '"-stop-marker stop-marker grid-marker',
-                    html:   '<div style="background-color: red"><span>'+ verspätung +' </span></div>',
-                    iconSize: L.point(40,40)
+                // Initialize the cluster
+                var markers = L.markerClusterGroup({
+                    iconCreateFunction: clusterIconFunction,
+                    maxClusterRadius: calculateClusterRadius,
                 });
 
-                var marker = L.marker(new L.LatLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]), {
-                    title: title,
-                    icon: markerIcon
-                })
-                markers.addLayer(marker);
-            }else{
-//                console.log(feature.properties);
-//                console.log(DATA[feature.properties.name]);
+                // Add the markers to the cluster
+                for(i = 0; i < stations_json.length; i++){
+                    var feature = stations_json[i];
+                    var name = feature.fields.name;
+                    var didok = feature.fields.didok85;
+                    var dataEntry = bpuic_data[0][didok];
+                    if(typeof dataEntry != 'undefined'){
+                        //                    console.log(didok);
+                        //                    console.log(dataEntry);
+                        //                    console.log(dataEntry.totalDelay);
+                        var averageDelay = Math.round(dataEntry.totalDelay / dataEntry.delayCounter);
+                        var averageStay = Math.round( 10 * (dataEntry.totalStay / dataEntry.stayCounter));
+
+                        if(showDelay && !isNaN(averageDelay)){
+                            var normalizedDelay = normalizeDelay(averageDelay);
+                            var rgb = calculateRGBA(normalizedDelay, 1);
+
+                            var markerIcon = L.divIcon({
+                                className: '"' + name + '"-stop-marker stop-marker grid-marker div-icon-indiv',
+                                html:   '<div style="background-color:'+rgb+'"></div>',
+                                iconSize: L.point(25,25),
+                            });
+
+                            var marker = L.marker(new L.LatLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]), {
+                                title: name,
+                                icon: markerIcon,
+                                delay: averageDelay,
+                                stay: averageStay
+                            });
+                            marker.bindPopup(structureStopData(dataEntry)).openPopup();
+                            markers.addLayer(marker);
+                        }
+                        if(!showDelay && !isNaN(averageStay)){
+                            var markerIcon = L.divIcon({
+                                className: '"' + name + '"-stop-marker stop-marker grid-marker div-icon-indiv',
+                                html:   '<div style="background-color:red;"  ><span>'+ averageStay +' </span></div>',
+                                iconSize: L.point(25,25)
+                            });
+
+                            var marker = L.marker(new L.LatLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]), {
+                                title: name,
+                                icon: markerIcon,
+                                delay: averageDelay,
+                                stay: averageStay
+                            })
+                            markers.addLayer(marker);
+                        }
+
+                    }
+                }
+                // Add the cluster to the map
+                mymap.addLayer(markers);
             }
 
+            L.Marker.DataMarker = L.Marker.extend({
+                delay: 0,
+                stay: 0,
+            });
 
-        }
+            L.Marker.DataMarker.addInitHook(function(options){
+                if(this.options.stay){
+                    this._stay = this.options.stay;   
+                }
+                if(this.options.delay){
+                    this._delay = this.options.delay;
+                }
+            });
 
-        // Add the cluster to the map
-        mymap.addLayer(markers);
-    }
+            L.marker.dataMarker = function(){
+                return new L.Marker.DataMarker();   
+            }
 
-    // Fetches data and then calls the rend erMap back
-    d3.queue()
-        .defer(d3.json, 'data/haltestellen.geojson')
-        .defer(d3.json, 'data/sbb_data_complete_average.json')
-        .await(renderMap);
-    </script></body></html>
+            // Fetches data and then calls the rend erMap back
+            d3.queue()
+                .defer(d3.json, 'data/didok-liste.json')
+            //.defer(d3.json, 'data/sbb_data_complete_average.json')
+                .defer(d3.json, 'data/sbb_data_complete_average_bpuic.json')
+                .await(renderMap);
+        </script></body></html>
